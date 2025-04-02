@@ -2,6 +2,8 @@
 
 AI Shell is a powerful command-line tool that converts natural language into CLI commands. It uses a hybrid approach with both local LLM (TinyLlama) and cloud-based AI services to generate accurate commands for your operating system.
 
+![alt text](image.png)
+
 ## Features
 
 - Convert natural language to CLI commands
