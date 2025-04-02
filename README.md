@@ -14,6 +14,13 @@ AI Shell is a powerful command-line tool that converts natural language into CLI
 - SSH remote execution support
 - Auto-correction for typos
 
+## Platform Support
+
+AI Shell works on:
+- Windows
+- macOS
+- Linux distributions
+
 ## Installation
 
 ### Easy Installation
@@ -62,15 +69,6 @@ ai-shell
 ```
 
 Type `exit` to quit the shell.
-
-## Platform Support
-
-AI Shell works on:
-- Windows
-- macOS
-- Linux distributions
-
-## Usage
 
 1. Type your request in natural language:
    ```
