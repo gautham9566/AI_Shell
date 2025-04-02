@@ -1,0 +1,159 @@
+import boto3
+import json
+from typing import Tuple, Optional, Dict, Any
+from botocore.config import Config
+from termcolor import colored
+
+from .base_provider import BaseProvider
+from .response_parser import ResponseParser
+
+class AWSBedrockProvider(BaseProvider):
+    """AWS Bedrock provider for Claude models"""
+    
+    def __init__(self):
+        self.client = None
+        self.model_id = None
+        self.region = None
+        
+    @property
+    def name(self) -> str:
+        return "aws_bedrock"
+    
+    @property
+    def description(self) -> str:
+        return f"AWS Bedrock ({self.model_id.split('.')[-1] if self.model_id else 'Claude'})"
+    
+    def initialize(self, config: Dict[str, Any]) -> bool:
+        """Initialize AWS Bedrock with configuration"""
+        try:
+            access_key = config.get("access_key_id")
+            secret_key = config.get("secret_access_key")
+            self.region = config.get("region")
+            self.model_id = config.get("model_id")
+            
+            if not access_key or not secret_key or not self.region:
+                print(colored("⚠️ AWS credentials not fully configured", "yellow"))
+                return False
+                
+            self.client = boto3.client(
+                'bedrock-runtime',
+                region_name=self.region,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                config=Config(retries={'max_attempts': 5, 'mode': 'standard'})
+            )
+            
+            # Test the connection
+            if not self.model_id:
+                self.model_id = "anthropic.claude-3-sonnet-20240229-v1:0"
+                print(colored("⚠️ AWS Bedrock model ID not configured - using default", "yellow"))
+                
+            test_response = self.client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 5,
+                    "messages": [{"role": "user", "content": [{"type": "text", "text": "Hi"}]}],
+                    "temperature": 0
+                })
+            )
+            
+            print(colored(f"✓ Claude (AWS Bedrock) initialized successfully with model {self.model_id}", "green"))
+            return True
+            
+        except Exception as e:
+            print(colored(f"⚠️ AWS Bedrock initialization failed: {str(e)}", "yellow"))
+            return False
+            
+    def generate_command(self, user_input: str, os_type: str) -> Tuple[Optional[str], Optional[str]]:
+        """Generate command using Claude with AWS Bedrock"""
+        if not self.client:
+            return None, None
+            
+        try:
+            system_prompt = f"""You are a {os_type} terminal expert. Follow STRICTLY:
+                1. Respond with ONLY the executable command on FIRST LINE
+                2. Use Windows cmd commands when target is windows
+                3. Use bash commands when target is linux/mac
+                4. Current system: {os_type}
+                5. Example Windows alternatives:
+                   - clear -> cls
+                   - ls -> dir
+                   - grep -> findstr
+                6. For file size queries:
+                   - "under 100MB" -> use "-size -100M" in find command or "where size < 100000000" in PowerShell
+                   - "over 1GB" -> use "-size +1G" in find command or "where size > 1000000000" in PowerShell"""
+                
+            response = self.client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 1000,
+                    "system": system_prompt,
+                    "messages": [{
+                        "role": "user",
+                        "content": [{
+                            "type": "text", 
+                            "text": f"Convert to terminal command: {user_input}\n\nCommand:"
+                        }]
+                    }],
+                    "temperature": 0.5
+                })
+            )
+            
+            # Handle the response properly
+            response_body = json.loads(response['body'].read())
+            if 'content' not in response_body or not response_body['content']:
+                print(colored("⚠️ Empty response from Claude", "red"))
+                return None, None
+                
+            full_response = response_body['content'][0]['text']
+            command, explanation = ResponseParser.parse_claude_response(full_response, os_type)
+            
+            # Special handling for queries with comparison operators
+            if command is None and any(op in user_input for op in ['>', '<']):
+                return self._handle_special_char_query(user_input, os_type)
+                
+            return command, explanation if explanation else f"Generated by Claude ({self.model_id.split('.')[-1]})"
+            
+        except Exception as e:
+            print(colored(f"⚠️ Claude API Error: {str(e)}", "red"))
+            return None, None
+    
+    def _handle_special_char_query(self, query: str, os_type: str) -> Tuple[Optional[str], Optional[str]]:
+        """Special handling for comparison operators with proper escaping"""
+        if not self.client:
+            return None, None
+            
+        try:
+            # Replace comparison operators with words to avoid parsing issues
+            clean_query = query.replace(">", " greater than ").replace("<", " less than ")
+            
+            response = self.client.invoke_model(
+                modelId=self.model_id,
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 500,
+                    "system": f"Generate a {os_type} terminal command with proper operator handling",
+                    "messages": [{
+                        "role": "user",
+                        "content": [{
+                            "type": "text",
+                            "text": f"Convert to safe terminal command (use PowerShell or appropriate alternatives for Windows): {clean_query}"
+                        }]
+                    }],
+                    "temperature": 0.3
+                })
+            )
+            
+            response_body = json.loads(response['body'].read())
+            if 'content' not in response_body or not response_body['content']:
+                return None, None
+                
+            full_response = response_body['content'][0]['text']
+            command, explanation = ResponseParser.parse_claude_response(full_response, os_type)
+            return command, explanation if explanation else f"Generated by Claude (special handling)"
+            
+        except Exception as e:
+            print(colored(f"⚠️ Fallback Error: {str(e)}", "red"))
+            return None, None
