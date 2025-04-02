@@ -1,0 +1,25 @@
+{
+  "name": "aishell",
+  "version": "1.0.0",
+  "description": "AI-powered shell assistant",
+  "main": "bin/ai-shell.js",
+  "bin": {
+    "ai-shell": "./bin/ai-shell.js"
+  },
+  "scripts": {
+    "install": "node install.js",
+    "postinstall": "node install.js || npm run fallback-install",
+    "fallback-install": "cd bin && node install-fallback.js",
+    "uninstall": "node uninstall.js || npm run fallback-uninstall",
+    "fallback-uninstall": "cd bin && node uninstall-fallback.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ai",
+    "shell",
+    "assistant"
+  ],
+  "author": "",
+  "license": "ISC",
+  "preferGlobal": true
+}
