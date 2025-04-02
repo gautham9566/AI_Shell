@@ -56,6 +56,7 @@ Use the `\config` command to:
 - Set API provider (Claude, OpenAI, DeepSeek, or offline mode)
 - Configure API keys
 - Download or update the local LLM model
+- Download link for tiny llama: https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q5_K_M.gguf?download=true
 
 
 ## License
