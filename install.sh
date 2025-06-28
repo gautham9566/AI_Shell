@@ -23,7 +23,18 @@ fi
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-$PYTHON_CMD -m pip install -r requirements.txt
+
+# Try normal install
+$PYTHON_CMD -m pip install -r requirements.txt 2> pip_error.log
+
+# If it failed due to externally managed environment, retry with --break-system-packages
+if grep -q "externally-managed-environment" pip_error.log; then
+    echo "Detected PEP 668 restriction. Retrying with --break-system-packages..."
+    $PYTHON_CMD -m pip install --break-system-packages -r requirements.txt
+    $PYTHON_CMD -m pip install --break-system-packages boto3
+fi
+
+rm -f pip_error.log
 
 # Create the shell script launcher
 echo "Creating launcher script..."
